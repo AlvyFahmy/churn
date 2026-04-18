@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Churn Executive Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --primary-color: #2563eb;
+            --bg-color: #f1f5f9;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; margin: 0; display: flex; background-color: var(--bg-color); color: #1e293b; }
+
+        /* Sidebar Style */
+        .sidebar { width: var(--sidebar-width); height: 100vh; background: #0f172a; color: white; position: fixed; display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { padding: 30px 25px; font-size: 1.3rem; font-weight: bold; border-bottom: 1px solid #1e293b; color: #38bdf8; letter-spacing: 1px; }
+        .nav-menu { flex: 1; padding: 20px 0; }
+        .nav-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; color: #94a3b8; gap: 12px; }
+        .nav-item:hover { background: #1e293b; color: white; }
+        .nav-item.active { background: var(--primary-color); color: white; border-right: 4px solid #fff; box-shadow: inset -5px 0 10px rgba(0,0,0,0.2); }
+
+        /* Main Content */
+        .main-content { margin-left: var(--sidebar-width); flex: 1; padding: 40px; min-height: 100vh; min-width: 0; }
+        .page { display: none; animation: fadeIn 0.4s; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Header & Status */
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h1 { margin: 0; color: #0f172a; font-size: 24px; font-weight: 700; }
+        .status-indicator { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 50px; font-size: 12px; background: #fee2e2; color: #991b1b; font-weight: 600; box-shadow: var(--card-shadow); gap: 8px; }
+
+        /* Filter Row */
+        .filter-row { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; background: white; padding: 20px; border-radius: 12px; box-shadow: var(--card-shadow); }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+        select { padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; min-width: 180px; background: #f8fafc; font-family: inherit; font-size: 14px; cursor: pointer; outline: none; }
+        select:focus { border-color: var(--primary-color); }
+
+        /* KPI Style */
+        .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
+        .kpi-card { background: white; padding: 25px; border-radius: 12px; box-shadow: var(--card-shadow); text-align: left; border-top: 5px solid var(--primary-color); }
+        .kpi-label { color: #64748b; font-size: 14px; font-weight: 500; display: block; }
+        .kpi-value { font-size: 28px; font-weight: 800; color: #1e293b; margin-top: 10px; display: block; }
+
+        /* Grid layouts */
+        .bottom-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 25px; margin-bottom: 25px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: var(--card-shadow); margin-bottom: 25px; }
+        .card h3 { margin: 0 0 20px 0; font-size: 17px; color: #334155; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+        
+        /* Toggle Switch */
+        .sort-switch { display: flex; background: #f1f5f9; border-radius: 8px; padding: 3px; gap: 2px; }
+        .sort-btn { border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; color: #64748b; }
+        .sort-btn.active { background: white; color: var(--primary-color); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .chart-container { height: 400px; position: relative; width: 100%; }
+        
+        /* Table Style */
+        .table-wrapper { overflow-x: auto; max-height: 420px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8fafc; position: sticky; top: 0; padding: 15px 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 11px; }
+        td { padding: 14px 12px; border-bottom: 1px solid #f1f5f9; }
+        tr:hover { background: #f8fafc; }
+
+        .badge-rate { padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">📊 CHURN CORE</div>
+    <div class="nav-menu">
+        <div class="nav-item active" onclick="showPage('page1', this)">📈 Tren Churn & Rate</div>
+        <div class="nav-item" onclick="showPage('page2', this)">🏙️ City Detail Analysis</div>
+        <div class="nav-item" onclick="showPage('page3', this)">📦 Product Analysis</div>
+        <div class="nav-item" onclick="showPage('page4', this)">💡 Churn Reason</div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="header-container">
+        <h1 id="mainTitle">Overview Tren Churn</h1>
+        <div id="dataStatus" class="status-indicator">⏳ Menghubungkan ke GitHub...</div>
+    </div>
+
+    <div id="page1" class="page active">
+        <div class="card">
+            <h3>📈 Churn Growth & Rate Trend</h3>
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="comboChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📞 Churn Volume: VC vs IVC Trend</h3>
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="vcIvcChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>⏳ Churn Distribution by Vintage (Monthly Trend)</h3>
+            <div class="chart-container" style="height: 450px;">
+                <canvas id="vintageTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="page2" class="page">
+        <div class="filter-row">
+            <div class="filter-group"><label>📅 Periode</label><select id="fMonth" onchange="updatePage2()"></select></div>
+            <div class="filter-group"><label>🏢 Regional Group</label><select id="fRegGroup" onchange="onRegGroupChange()"><option value="ALL">Semua Regional Group</option></select></div>
+            <div class="filter-group"><label>📍 Region/Regional</label><select id="fRegion" onchange="updatePage2()"><option value="ALL">Semua Regional</option></select></div>
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card"><span class="kpi-label">👤 Total Churn</span><span id="kpiChurn" class="kpi-value">-</span></div>
+            <div class="kpi-card" style="border-top-color:#10b981"><span class="kpi-label">📦 Total EOP</span><span id="kpiEop" class="kpi-value">-</span></div>
+            <div class="kpi-card" style="border-top-color:#ef4444"><span class="kpi-label">📉 Churn Rate (%)</span><span id="kpiRate" class="kpi-value">-%</span></div>
+        </div>
+        <div class="bottom-grid">
+            <div class="card">
+                <h3>
+                    <span>🏆 Top 10 City by Churn Volume</span>
+                    <div class="sort-switch">
+                        <button class="sort-btn active" id="vCityCount" onclick="setCityViewMode('count')">COUNT</button>
+                        <button class="sort-btn" id="vCityPercent" onclick="setCityViewMode('percent')">PERCENT %</button>
+                    </div>
+                </h3>
+                <div class="chart-container"><canvas id="cityChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>
+                    <span>📋 Detail Data per City</span>
+                    <div class="sort-switch">
+                        <button class="sort-btn active" id="sortChurn" onclick="setSort('churn')">CHURN</button>
+                        <button class="sort-btn" id="sortRate" onclick="setSort('rate')">RATE %</button>
+                    </div>
+                </h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>City</th><th>Churn</th><th>EOP</th><th>Rate %</th></tr></thead>
+                        <tbody id="cityTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="page3" class="page">
+        <div class="filter-row">
+            <div class="filter-group"><label>📅 Periode</label><select id="fMonthProd" onchange="updatePage3()"></select></div>
+        </div>
+        <div class="bottom-grid">
+            <div class="card">
+                <h3>
+                    <span>📦 Churn Volume by Product</span>
+                    <div class="sort-switch">
+                        <button class="sort-btn active" id="viewCount" onclick="setViewMode('count')">COUNT</button>
+                        <button class="sort-btn" id="viewPercent" onclick="setViewMode('percent')">PERCENT %</button>
+                    </div>
+                </h3>
+                <div class="chart-container"><canvas id="productChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>
+                    <span>📋 Product Performance Detail</span>
+                    <div class="sort-switch">
+                        <button class="sort-btn active" id="sortProdChurn" onclick="setSortProd('churn')">CHURN</button>
+                        <button class="sort-btn" id="sortProdRate" onclick="setSortProd('rate')">RATE %</button>
+                    </div>
+                </h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Product / Speed</th><th>Churn</th><th>EOP</th><th>Rate %</th></tr></thead>
+                        <tbody id="productTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>📊 Top 5 Churn by Product (100% Stacked - Vintage Distribution)</h3>
+            <div class="chart-container" style="height: 450px;"><canvas id="vintageChart"></canvas></div>
+        </div>
+    </div>
+
+    <div id="page4" class="page">
+        <div class="filter-row">
+            <div class="filter-group"><label>📅 Periode</label><select id="fMonthReason" onchange="updatePage4()"></select></div>
+        </div>
+        <div class="bottom-grid">
+            <div class="card">
+                <h3>
+                    <span>💡 Churn Breakdown by Reason Final</span>
+                    <div class="sort-switch">
+                        <button class="sort-btn active" id="reasonCountBtn" onclick="setReasonViewMode('count')">COUNT</button>
+                        <button class="sort-btn" id="reasonPercentBtn" onclick="setReasonViewMode('percent')">PERCENT %</button>
+                    </div>
+                </h3>
+                <div class="chart-container"><canvas id="reasonChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>📋 Detail Table by Reason Final</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Reason Final</th><th>Churn Count</th><th>% Contribution</th></tr></thead>
+                        <tbody id="reasonTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const URL_CHURN = 'https://raw.githubusercontent.com/AlvyFahmy/churn/main/churn-detail.xlsx';
+    const URL_EOP = 'https://raw.githubusercontent.com/AlvyFahmy/churn/main/eop-summary.xlsx';
+
+    let rawChurn = [], rawEop = [], rawEopProduct = [];
+    let chart1 = null, chartVcIvc = null, chartVintageTrend = null;
+    let chartCity = null, chartProd = null, chartVintage = null, chartReason = null;
+    let currentSort = 'churn', currentSortProd = 'churn', currentViewMode = 'count', currentCityViewMode = 'count', currentReasonViewMode = 'count';
+    
+    const monthsOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const vintageOrder = ["1-3 Month", "4-6 Month", "7-9 Month", "10-12 Month", "1-2 Year", "2-3 Year", "> 3 Year"];
+    const vintageColors = ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
+
+    function showPage(pageId, el) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        el.classList.add('active');
+        
+        if(pageId === 'page1') { document.getElementById('mainTitle').innerText = "Overview Tren Churn"; renderPage1Charts(); }
+        else if(pageId === 'page2') { document.getElementById('mainTitle').innerText = "City Detail Analysis"; updatePage2(); }
+        else if(pageId === 'page3') { document.getElementById('mainTitle').innerText = "Product Breakdown Analysis"; updatePage3(); }
+        else if(pageId === 'page4') { document.getElementById('mainTitle').innerText = "Churn Reason Analysis"; updatePage4(); }
+    }
+
+    function setCityViewMode(mode) { currentCityViewMode = mode; document.getElementById('vCityCount').classList.toggle('active', mode === 'count'); document.getElementById('vCityPercent').classList.toggle('active', mode === 'percent'); updatePage2(); }
+    function setReasonViewMode(mode) { currentReasonViewMode = mode; document.getElementById('reasonCountBtn').classList.toggle('active', mode === 'count'); document.getElementById('reasonPercentBtn').classList.toggle('active', mode === 'percent'); updatePage4(); }
+    function setSort(type) { currentSort = type; document.getElementById('sortChurn').classList.toggle('active', type === 'churn'); document.getElementById('sortRate').classList.toggle('active', type === 'rate'); updatePage2(); }
+    function setSortProd(type) { currentSortProd = type; document.getElementById('sortProdChurn').classList.toggle('active', type === 'churn'); document.getElementById('sortProdRate').classList.toggle('active', type === 'rate'); updatePage3(); }
+    function setViewMode(mode) { currentViewMode = mode; document.getElementById('viewCount').classList.toggle('active', mode === 'count'); document.getElementById('viewPercent').classList.toggle('active', mode === 'percent'); updatePage3(); }
+
+    async function init() {
+        const statusEl = document.getElementById('dataStatus');
+        try {
+            const [resC, resE] = await Promise.all([
+                fetch(`${URL_CHURN}?t=${Date.now()}`).then(r => r.arrayBuffer()),
+                fetch(`${URL_EOP}?t=${Date.now()}`).then(r => r.arrayBuffer())
+            ]);
+            const wbC = XLSX.read(resC, { type: 'array' });
+            rawChurn = XLSX.utils.sheet_to_json(wbC.Sheets['churn'] || wbC.Sheets[wbC.SheetNames[0]]);
+            const wbE = XLSX.read(resE, { type: 'array' });
+            rawEop = XLSX.utils.sheet_to_json(wbE.Sheets[wbE.SheetNames[0]]);
+            rawEopProduct = XLSX.utils.sheet_to_json(wbE.Sheets['eop_product'] || wbE.Sheets[0]);
+
+            statusEl.innerHTML = "✅ Data GitHub Terhubung";
+            statusEl.style.background = "#dcfce7"; statusEl.style.color = "#166534";
+            populateFilters();
+            renderPage1Charts();
+        } catch (error) { statusEl.innerHTML = "❌ Gagal Memuat Data"; console.error(error); }
+    }
+
+    function populateFilters() {
+        const months = [...new Set(rawChurn.map(d => d['PERIODE CHURN']))].filter(Boolean).sort((a,b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+        ['fMonth', 'fMonthProd', 'fMonthReason'].forEach(id => {
+            const el = document.getElementById(id);
+            el.innerHTML = "";
+            months.forEach(m => el.add(new Option(m, m)));
+            if(months.length > 0) el.value = months[months.length-1];
+        });
+
+        const regGroups = [...new Set(rawChurn.map(d => d['REGIONAL GROUP']))].filter(Boolean).sort();
+        const fRG = document.getElementById('fRegGroup'); fRG.innerHTML = '<option value="ALL">Semua Regional Group</option>';
+        regGroups.forEach(rg => fRG.add(new Option(rg, rg)));
+        onRegGroupChange();
+    }
+
+    function onRegGroupChange() {
+        const selectedGroup = document.getElementById('fRegGroup').value;
+        const fR = document.getElementById('fRegion'); fR.innerHTML = '<option value="ALL">Semua Regional</option>';
+        let regions = (selectedGroup === "ALL") ? [...new Set(rawChurn.map(d => d['REGION_CITY']))] : [...new Set(rawChurn.filter(d => d['REGIONAL GROUP'] === selectedGroup).map(d => d['REGION_CITY']))];
+        regions.filter(Boolean).sort().forEach(r => fR.add(new Option(r, r)));
+        updatePage2();
+    }
+
+    // FUNGSI RENDER PAGE 1 (UTAMA)
+    function renderPage1Charts() {
+        const labels = [...new Set(rawChurn.map(d => d['PERIODE CHURN']))].filter(Boolean).sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+        
+        // Data Combo
+        const counts = labels.map(m => rawChurn.filter(d => d['PERIODE CHURN'] === m).length);
+        const rates = labels.map(m => {
+            const sumEop = rawEop.filter(d => (d['PERIODE'] || d['PERIOD'] || d['Periode']) === m).reduce((acc, curr) => acc + (parseFloat(curr['TOTAL EOP'] || curr['Total EOP']) || 0), 0);
+            return sumEop > 0 ? (rawChurn.filter(d => d['PERIODE CHURN'] === m).length / sumEop * 100).toFixed(2) : 0;
+        });
+
+        // 1. Render Combo Chart
+        if (chart1) chart1.destroy();
+        chart1 = new Chart(document.getElementById('comboChart').getContext('2d'), {
+            data: { labels: labels, datasets: [
+                { type: 'line', label: 'Churn Rate (%)', data: rates, borderColor: '#ef4444', borderWidth: 3, yAxisID: 'y1', tension: 0.3, pointRadius: 5 },
+                { type: 'bar', label: 'Total Churn', data: counts, backgroundColor: 'rgba(37, 99, 235, 0.6)', borderRadius: 5, yAxisID: 'y' }
+            ]},
+            options: { responsive: true, maintainAspectRatio: false, scales: { y1: { position: 'right', grid: { display: false }, ticks: { callback: v => v + '%' } } } }
+        });
+
+        // 2. Render VC vs IVC Chart
+        const vcData = labels.map(m => rawChurn.filter(d => d['PERIODE CHURN'] === m && d['CATEGORY CALL'] === 'VC').length);
+        const ivcData = labels.map(m => rawChurn.filter(d => d['PERIODE CHURN'] === m && d['CATEGORY CALL'] === 'IVC').length);
+
+        if (chartVcIvc) chartVcIvc.destroy();
+        chartVcIvc = new Chart(document.getElementById('vcIvcChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Voluntary (VC)', data: vcData, borderColor: '#10b981', backgroundColor: '#10b981', tension: 0.3, fill: false, borderWidth: 3 },
+                    { label: 'Involuntary (IVC)', data: ivcData, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3, fill: false, borderWidth: 3 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // 3. Render Vintage Distribution Trend (Stacked Bar)
+        const vintageDatasets = vintageOrder.map((vLabel, idx) => ({
+            label: vLabel,
+            backgroundColor: vintageColors[idx % vintageColors.length],
+            data: labels.map(m => rawChurn.filter(d => d['PERIODE CHURN'] === m && d['VINTAGE GROUP'] === vLabel).length)
+        }));
+
+        if (chartVintageTrend) chartVintageTrend.destroy();
+        chartVintageTrend = new Chart(document.getElementById('vintageTrendChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: labels, datasets: vintageDatasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true }, y: { stacked: true } },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    // FUNGSI UPDATE PAGE LAIN (TIDAK DIPOTONG)
+    function updatePage2() {
+        const month = document.getElementById('fMonth').value;
+        const regGroup = document.getElementById('fRegGroup').value;
+        const region = document.getElementById('fRegion').value;
+
+        let fChurn = rawChurn.filter(d => d['PERIODE CHURN'] === month);
+        if(regGroup !== "ALL") fChurn = fChurn.filter(d => d['REGIONAL GROUP'] === regGroup);
+        if(region !== "ALL") fChurn = fChurn.filter(d => d['REGION_CITY'] === region);
+
+        let fEop = rawEop.filter(d => (d['PERIODE'] || d['PERIOD'] || d['Periode']) === month);
+        if(regGroup !== "ALL") fEop = fEop.filter(d => d['REGIONAL GROUP'] === regGroup);
+        if(region !== "ALL") fEop = fEop.filter(d => d['REGION_CITY'] === region);
+
+        const tChurn = fChurn.length;
+        const tEop = fEop.reduce((a, b) => a + (parseFloat(b['TOTAL EOP'] || b['Total EOP']) || 0), 0);
+        const tRate = tEop > 0 ? ((tChurn / tEop) * 100).toFixed(2) : 0;
+
+        document.getElementById('kpiChurn').innerText = tChurn.toLocaleString();
+        document.getElementById('kpiEop').innerText = tEop.toLocaleString();
+        document.getElementById('kpiRate').innerText = tRate + '%';
+
+        const cityMap = {};
+        fChurn.forEach(d => { const c = d['CITY'] || 'Unknown'; if(!cityMap[c]) cityMap[c] = { churn: 0, eop: 0 }; cityMap[c].churn++; });
+        fEop.forEach(d => { const c = d['CITY'] || 'Unknown'; if(!cityMap[c]) cityMap[c] = { churn: 0, eop: 0 }; cityMap[c].eop += (parseFloat(d['TOTAL EOP'] || d['Total EOP']) || 0); });
+
+        const sorted = Object.entries(cityMap).map(([city, v]) => ({
+            city, churn: v.churn, eop: v.eop, 
+            rate: v.eop > 0 ? ((v.churn / v.eop)*100).toFixed(2) : 0,
+            percent: tChurn > 0 ? ((v.churn / tChurn) * 100).toFixed(2) : 0
+        })).sort((a,b) => currentSort === 'churn' ? b.churn - a.churn : b.rate - a.rate);
+
+        if (chartCity) chartCity.destroy();
+        chartCity = new Chart(document.getElementById('cityChart').getContext('2d'), {
+            type: 'bar', 
+            data: { labels: sorted.slice(0, 10).map(d => d.city), datasets: [{ label: currentCityViewMode === 'count' ? 'Count' : '%', data: sorted.slice(0, 10).map(d => currentCityViewMode === 'count' ? d.churn : d.percent), backgroundColor: '#2563eb', borderRadius: 5 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+        });
+
+        document.getElementById('cityTable').innerHTML = sorted.map(d => `<tr><td>${d.city}</td><td>${d.churn.toLocaleString()}</td><td>${d.eop.toLocaleString()}</td><td><span class="badge-rate" style="background:${d.rate>5?'#fee2e2':'#dcfce7'}">${d.rate}%</span></td></tr>`).join('');
+    }
+
+    function updatePage3() {
+        const month = document.getElementById('fMonthProd').value;
+        let fChurn = rawChurn.filter(d => d['PERIODE CHURN'] === month);
+        let fEopProd = rawEopProduct.filter(d => (d['PERIODE'] || d['PERIOD'] || d['Periode']) === month);
+        let totalChurn = fChurn.length;
+
+        const prodMap = {}, vintageMap = {};
+        fChurn.forEach(d => {
+            const p = d['SERVICE TYPE'] || 'Others';
+            if(!prodMap[p]) prodMap[p] = { churn: 0, eop: 0 };
+            prodMap[p].churn++;
+            const v = d['VINTAGE GROUP'] || 'Others';
+            if(!vintageMap[p]) vintageMap[p] = {};
+            vintageMap[p][v] = (vintageMap[p][v] || 0) + 1;
+        });
+
+        fEopProd.forEach(d => {
+            const p = d['Speed'] || 'Others';
+            if(!prodMap[p]) prodMap[p] = { churn: 0, eop: 0 };
+            prodMap[p].eop += (parseFloat(d['TOTAL EOP'] || d['Total EOP']) || 0);
+        });
+
+        const sorted = Object.entries(prodMap).map(([prod, v]) => ({
+            prod, churn: v.churn, eop: v.eop, 
+            rate: v.eop > 0 ? ((v.churn / v.eop)*100).toFixed(2) : 0,
+            percent: totalChurn > 0 ? ((v.churn / totalChurn) * 100).toFixed(2) : 0
+        })).sort((a,b) => currentSortProd === 'churn' ? b.churn - a.churn : b.rate - a.rate);
+
+        if (chartProd) chartProd.destroy();
+        chartProd = new Chart(document.getElementById('productChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: sorted.map(d => d.prod), datasets: [{ label: currentViewMode === 'count' ? 'Count' : '%', data: sorted.map(d => currentViewMode === 'count' ? d.churn : d.percent), backgroundColor: '#38bdf8' }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        const top5 = sorted.slice(0, 5).map(d => d.prod);
+        const vDatasets = vintageOrder.map((vLabel, idx) => ({
+            label: vLabel, backgroundColor: vintageColors[idx % vintageColors.length],
+            data: top5.map(p => {
+                const total = vintageMap[p] ? Object.values(vintageMap[p]).reduce((a,b)=>a+b,0) : 0;
+                return total > 0 ? (((vintageMap[p][vLabel] || 0) / total) * 100).toFixed(2) : 0;
+            })
+        }));
+        if (chartVintage) chartVintage.destroy();
+        chartVintage = new Chart(document.getElementById('vintageChart').getContext('2d'), {
+            type: 'bar', data: { labels: top5, datasets: vDatasets },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, max: 100 } } }
+        });
+
+        document.getElementById('productTable').innerHTML = sorted.map(d => `<tr><td>${d.prod}</td><td>${d.churn.toLocaleString()}</td><td>${d.eop.toLocaleString()}</td><td><span class="badge-rate" style="background:${d.rate>5?'#fee2e2':'#dcfce7'}">${d.rate}%</span></td></tr>`).join('');
+    }
+
+    function updatePage4() {
+        const month = document.getElementById('fMonthReason').value;
+        const fChurn = rawChurn.filter(d => d['PERIODE CHURN'] === month);
+        const totalChurn = fChurn.length;
+        const reasonMap = {};
+        fChurn.forEach(d => {
+            const reason = d['REASON FINAL'] ? d['REASON FINAL'].toString().trim() : 'Uncategorized';
+            reasonMap[reason] = (reasonMap[reason] || 0) + 1;
+        });
+        const sorted = Object.entries(reasonMap).map(([reason, count]) => ({ reason, count, percent: totalChurn > 0 ? ((count / totalChurn) * 100).toFixed(2) : 0 })).sort((a,b) => b.count - a.count);
+
+        if (chartReason) chartReason.destroy();
+        chartReason = new Chart(document.getElementById('reasonChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: sorted.map(d => d.reason), datasets: [{ label: currentReasonViewMode === 'count' ? 'Count' : '%', data: sorted.map(d => currentReasonViewMode === 'count' ? d.count : d.percent), backgroundColor: '#10b981', borderRadius: 8 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+        });
+        document.getElementById('reasonTable').innerHTML = sorted.map(d => `<tr><td>${d.reason}</td><td>${d.count.toLocaleString()}</td><td><span class="badge-rate" style="background:#dcfce7">${d.percent}%</span></td></tr>`).join('');
+    }
+
+    init();
+</script>
+</body>
+</html>
