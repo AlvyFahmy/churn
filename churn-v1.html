@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churn Executive Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root {
+            --sidebar-w: 260px;
+            --accent: #1d4ed8;
+            --accent-light: #3b82f6;
+            --accent-glow: rgba(29, 78, 216, 0.25);
+            --accent-bg: rgba(29, 78, 216, 0.08);
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.08);
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.08);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.08);
+            --bg: #f4f6fa;
+            --bg-grad: linear-gradient(135deg, #f0f4f8 0%, #e8ecf4 50%, #f0f2f8 100%);
+            --card: #ffffff;
+            --sidebar-bg: linear-gradient(180deg, #070b14 0%, #0c1220 40%, #0f1729 100%);
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --border-light: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+            --shadow: 0 4px 16px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+            --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+            --radius: 14px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; margin: 0; display: flex; background: var(--bg); color: var(--text); min-height: 100vh; }
+        body::before { content: ''; position: fixed; inset: 0; background: var(--bg-grad); z-index: -2; }
+        body::after { content: ''; position: fixed; inset: 0; z-index: -1; opacity: 0.35; background-image: radial-gradient(circle at 20% 20%, var(--accent-glow) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(99,102,241,0.12) 0%, transparent 50%), radial-gradient(circle at 50% 50%, rgba(245,158,11,0.05) 0%, transparent 60%); pointer-events: none; }
+
+        .login-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; transition: opacity 0.5s cubic-bezier(0.4,0,0.2,1), transform 0.5s cubic-bezier(0.4,0,0.2,1); }
+        .login-overlay.hidden { opacity: 0; transform: scale(1.03); pointer-events: none; }
+        .login-bg { position: absolute; inset: 0; background: linear-gradient(160deg, #070b14 0%, #0c1524 35%, #0d1a2d 65%, #0a101e 100%); overflow: hidden; }
+        .login-bg::before { content: ''; position: absolute; top: -30%; left: -20%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(29,78,216,0.2) 0%, transparent 70%); animation: floatOrb1 12s ease-in-out infinite; }
+        .login-bg::after { content: ''; position: absolute; bottom: -20%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%); animation: floatOrb2 15s ease-in-out infinite; }
+        @keyframes floatOrb1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(60px,40px) scale(1.15); } }
+        @keyframes floatOrb2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,-30px) scale(1.1); } }
+        .login-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 100%); }
+        .login-particles { position: absolute; inset: 0; overflow: hidden; }
+        .login-particles span { position: absolute; width: 2px; height: 2px; background: rgba(59,130,246,0.5); border-radius: 50%; animation: drift linear infinite; }
+        @keyframes drift { 0% { transform: translateY(100vh) scale(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-10vh) scale(1); opacity: 0; } }
+        .login-card { position: relative; z-index: 2; width: 100%; max-width: 420px; margin: 20px; background: rgba(255,255,255,0.03); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 44px 38px 36px; box-shadow: 0 24px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05) inset; }
+        .login-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+        .login-logo-icon { width: 48px; height: 48px; background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(29,78,216,0.4); }
+        .login-logo-icon svg { width: 26px; height: 26px; stroke: white; fill: none; stroke-width: 2; }
+        .login-logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 700; color: #f1f5f9; }
+        .login-logo-sub { font-size: 0.68rem; color: #64748b; letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
+        .login-heading { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin: 28px 0 6px; }
+        .login-desc { font-size: 0.82rem; color: #64748b; margin-bottom: 30px; line-height: 1.5; }
+        .login-field { margin-bottom: 18px; }
+        .login-field label { display: block; font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+        .login-input-wrap { position: relative; }
+        .login-input-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: #475569; fill: none; stroke-width: 1.8; transition: stroke 0.2s; pointer-events: none; }
+        .login-input { width: 100%; padding: 13px 14px 13px 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #f1f5f9; font-family: inherit; font-size: 0.9rem; font-weight: 500; outline: none; transition: border-color 0.25s, box-shadow 0.25s, background 0.25s; }
+        .login-input::placeholder { color: #475569; }
+        .login-input:focus { border-color: var(--accent-light); box-shadow: 0 0 0 3px rgba(29,78,216,0.2); background: rgba(255,255,255,0.06); }
+        .login-input:focus + svg, .login-input:focus ~ svg { stroke: var(--accent-light); }
+        .login-input.error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+        .login-toggle-pw { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px; color: #475569; transition: color 0.2s; }
+        .login-toggle-pw:hover { color: #94a3b8; }
+        .login-toggle-pw svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; position: static; transform: none; }
+        .login-error { display: none; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; font-size: 0.8rem; font-weight: 500; margin-bottom: 18px; animation: shakeError 0.4s; }
+        .login-error.show { display: flex; }
+        .login-error svg { width: 18px; height: 18px; stroke: #fca5a5; fill: none; stroke-width: 2; flex-shrink: 0; }
+        @keyframes shakeError { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+        .login-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--accent) 0%, #1e40af 100%); color: white; font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: 0 4px 16px rgba(29,78,216,0.3); margin-top: 6px; position: relative; overflow: hidden; }
+        .login-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(29,78,216,0.45); }
+        .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .login-btn .btn-spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto; }
+        .login-btn.loading .btn-text { display: none; }
+        .login-btn.loading .btn-spinner { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .login-footer { text-align: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem; color: #475569; }
+
+        .sidebar { width: var(--sidebar-w); height: 100vh; background: var(--sidebar-bg); color: white; position: fixed; display: flex; flex-direction: column; z-index: 100; overflow: hidden; }
+        .sidebar::after { content: ''; position: absolute; bottom: -80px; left: -40px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(29,78,216,0.15) 0%, transparent 70%); pointer-events: none; }
+        .sidebar-header { padding: 28px 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .sidebar-logo { display: flex; align-items: center; gap: 12px; }
+        .sidebar-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(29,78,216,0.4); flex-shrink: 0; }
+        .sidebar-logo-icon svg { width: 22px; height: 22px; stroke: white; fill: none; stroke-width: 2; }
+        .sidebar-logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 1.15rem; font-weight: 700; color: #f1f5f9; letter-spacing: 0.5px; }
+        .sidebar-logo-sub { font-size: 0.65rem; color: var(--text-muted); font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
+        .nav-menu { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-section-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 2px; color: rgba(148,163,184,0.5); padding: 16px 14px 8px; font-weight: 600; }
+        .nav-item { padding: 12px 14px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); display: flex; align-items: center; color: #64748b; gap: 12px; border-radius: var(--radius-sm); margin-bottom: 2px; font-size: 0.875rem; font-weight: 500; }
+        .nav-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+        .nav-item:hover { background: rgba(255,255,255,0.04); color: #cbd5e1; }
+        .nav-item.active { background: linear-gradient(135deg, rgba(29,78,216,0.15) 0%, rgba(59,130,246,0.08) 100%); color: var(--accent-light); box-shadow: inset 3px 0 0 var(--accent-light), 0 0 20px rgba(29,78,216,0.08); }
+        .nav-item.active svg { stroke: var(--accent-light); }
+        .sidebar-user { padding: 18px 20px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .sidebar-user-info { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .sidebar-avatar { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.8rem; color: white; flex-shrink: 0; }
+        .sidebar-user-name { font-size: 0.82rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .sidebar-user-role { font-size: 0.65rem; color: #64748b; margin-top: 1px; }
+        .logout-btn { width: 100%; padding: 9px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #94a3b8; font-family: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .logout-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .logout-btn:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
+
+        .main-content { margin-left: var(--sidebar-w); flex: 1; padding: 32px 36px 48px; min-height: 100vh; min-width: 0; }
+        .page { display: none; }
+        .page.active { display: block; animation: pageFadeIn 0.45s cubic-bezier(0.4,0,0.2,1); }
+        @keyframes pageFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+        .header-title { font-family: 'Space Grotesk', sans-serif; margin: 0; color: var(--text); font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+        .header-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        .status-indicator { display: inline-flex; align-items: center; padding: 8px 18px; border-radius: 50px; font-size: 0.75rem; background: var(--card); color: var(--text-secondary); font-weight: 600; box-shadow: var(--shadow-sm); gap: 8px; border: 1px solid var(--border-light); transition: all 0.4s; }
+        .status-indicator.connected { background: var(--success-bg); color: #065f46; border-color: rgba(16,185,129,0.2); }
+        .status-indicator.error { background: var(--danger-bg); color: #991b1b; border-color: rgba(239,68,68,0.2); }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+        .status-indicator.connected .status-dot { background: var(--success); animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.4); } }
+
+        .filter-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; background: var(--card); padding: 18px 22px; border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; }
+        .filter-group label { font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        select { padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); min-width: 180px; background: #f8fafc; font-family: inherit; font-size: 0.825rem; font-weight: 500; cursor: pointer; outline: none; color: var(--text); transition: border-color 0.2s, box-shadow 0.2s; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+        select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+        .cb-dropdown { position: relative; min-width: 320px; }
+        .cb-dropdown-trigger { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: #f8fafc; font-family: inherit; font-size: 0.825rem; font-weight: 500; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: border-color 0.2s, box-shadow 0.2s; user-select: none; }
+        .cb-dropdown-trigger:hover { border-color: #cbd5e1; }
+        .cb-dropdown.open .cb-dropdown-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .cb-dropdown-trigger-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cb-dropdown-trigger-text .cb-count { font-weight: 700; color: var(--accent); }
+        .cb-dropdown-arrow { width: 16px; height: 16px; stroke: var(--text-muted); fill: none; stroke-width: 2; transition: transform 0.2s; flex-shrink: 0; }
+        .cb-dropdown.open .cb-dropdown-arrow { transform: rotate(180deg); }
+        .cb-dropdown-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); z-index: 500; display: none; overflow: hidden; animation: cbDropIn 0.2s ease-out; }
+        .cb-dropdown.open .cb-dropdown-panel { display: block; }
+        @keyframes cbDropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        .cb-dropdown-search { padding: 10px 12px; border-bottom: 1px solid var(--border-light); }
+        .cb-dropdown-search input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-xs); font-family: inherit; font-size: 0.78rem; outline: none; color: var(--text); background: #f8fafc; }
+        .cb-dropdown-search input:focus { border-color: var(--accent); }
+        .cb-dropdown-list { max-height: 220px; overflow-y: auto; padding: 6px 0; }
+        .cb-dropdown-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; transition: background 0.12s; font-size: 0.8rem; color: var(--text-secondary); }
+        .cb-dropdown-item:hover { background: var(--accent-bg); }
+        .cb-dropdown-item.selected { color: var(--text); font-weight: 600; }
+        .cb-dropdown-item.select-all { border-bottom: 1px solid var(--border-light); margin-bottom: 2px; font-weight: 700; color: var(--text); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .cb-checkbox { width: 16px; height: 16px; border-radius: 4px; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+        .cb-dropdown-item.selected .cb-checkbox { background: var(--accent); border-color: var(--accent); }
+        .cb-checkbox svg { width: 10px; height: 10px; stroke: white; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity 0.15s; }
+        .cb-dropdown-item.selected .cb-checkbox svg { opacity: 1; }
+        .cb-dropdown-item.hidden { display: none; }
+
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .kpi-card { background: var(--card); padding: 20px 22px; border-radius: var(--radius); box-shadow: var(--shadow); position: relative; overflow: hidden; border: 1px solid var(--border-light); transition: transform 0.3s, box-shadow 0.3s; }
+        .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+        .kpi-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 0 4px 4px 0; }
+        .kpi-churn::before { background: linear-gradient(180deg, var(--accent), #60a5fa); }
+        .kpi-eop::before { background: linear-gradient(180deg, var(--success), #34d399); }
+        .kpi-rate::before { background: linear-gradient(180deg, var(--danger), #f87171); }
+        .kpi-warning::before { background: linear-gradient(180deg, var(--warning), #fbbf24); }
+        .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .kpi-label { color: var(--text-muted); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .kpi-icon svg { width: 16px; height: 16px; stroke-width: 2; fill: none; }
+        .kpi-churn .kpi-icon { background: var(--accent-bg); } .kpi-churn .kpi-icon svg { stroke: var(--accent); }
+        .kpi-eop .kpi-icon { background: var(--success-bg); } .kpi-eop .kpi-icon svg { stroke: var(--success); }
+        .kpi-rate .kpi-icon { background: var(--danger-bg); } .kpi-rate .kpi-icon svg { stroke: var(--danger); }
+        .kpi-warning .kpi-icon { background: var(--warning-bg); } .kpi-warning .kpi-icon svg { stroke: var(--warning); }
+        .kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -1px; }
+        .kpi-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 5px; }
+
+        .card { background: var(--card); padding: 24px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 22px; border: 1px solid var(--border-light); transition: box-shadow 0.3s; }
+        .card:hover { box-shadow: var(--shadow-lg); }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-light); gap: 12px; flex-wrap: wrap; }
+        .card-title { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; color: var(--text); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .card-title-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .card-title-icon svg { width: 16px; height: 16px; stroke-width: 2; fill: none; }
+        .card-title-icon.blue { background: var(--accent-bg); } .card-title-icon.blue svg { stroke: var(--accent); }
+        .card-title-icon.amber { background: var(--warning-bg); } .card-title-icon.amber svg { stroke: var(--warning); }
+        .card-title-icon.green { background: var(--success-bg); } .card-title-icon.green svg { stroke: var(--success); }
+        .card-title-icon.red { background: var(--danger-bg); } .card-title-icon.red svg { stroke: var(--danger); }
+        .card-title-icon.indigo { background: rgba(99,102,241,0.08); } .card-title-icon.indigo svg { stroke: #6366f1; }
+        .sort-switch { display: flex; background: var(--bg); border-radius: var(--radius-xs); padding: 3px; gap: 2px; flex-shrink: 0; }
+        .sort-btn { border: none; padding: 5px 12px; border-radius: 5px; font-size: 0.65rem; font-weight: 700; cursor: pointer; transition: all 0.2s; color: var(--text-muted); background: transparent; font-family: inherit; letter-spacing: 0.5px; }
+        .sort-btn:hover { color: var(--text-secondary); }
+        .sort-btn.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .chart-container { height: 400px; position: relative; width: 100%; }
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px; }
+        .bottom-grid-wide { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; margin-bottom: 22px; }
+
+        .table-wrapper { overflow-x: auto; max-height: 480px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        thead { position: sticky; top: 0; z-index: 2; }
+        th { background: #f8fafc; padding: 12px 14px; text-align: left; color: var(--text-muted); font-weight: 700; border-bottom: 1px solid var(--border); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.8px; }
+        td { padding: 12px 14px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); font-weight: 500; }
+        tr:last-child td { border-bottom: none; }
+        tbody tr { transition: background 0.15s; }
+        tbody tr:hover { background: var(--accent-bg); }
+        td:first-child { color: var(--text); font-weight: 600; }
+        .badge-rate { padding: 3px 10px; border-radius: 50px; font-weight: 700; font-size: 0.72rem; display: inline-block; margin: 1px 2px; }
+        .badge-danger { background: var(--danger-bg); color: #dc2626; }
+        .badge-safe { background: var(--success-bg); color: #059669; }
+        .badge-warn { background: var(--warning-bg); color: #b45309; }
+
+        .heatmap-table { width: 100%; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
+        .heatmap-table th { background: transparent; border: none; font-size: 0.6rem; text-align: center; color: var(--text-muted); letter-spacing: 0.5px; }
+        .heatmap-table td { height: 40px; text-align: center; font-size: 0.73rem; font-weight: 700; border-radius: 6px; transition: transform 0.15s, box-shadow 0.15s; }
+        .heatmap-table td:hover { transform: scale(1.1); z-index: 1; position: relative; box-shadow: 0 4px 12px rgba(29,78,216,0.3); }
+        .heatmap-label { text-align: left !important; color: var(--text-secondary) !important; font-weight: 600 !important; width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: transparent !important; font-size: 0.75rem !important; cursor: default; }
+        .heatmap-label:hover { transform: none !important; box-shadow: none !important; }
+        .heatmap-total-label { text-align: right !important; color: var(--text) !important; font-weight: 700 !important; background: transparent !important; font-size: 0.72rem !important; width: 70px; cursor: default; }
+        .heatmap-total-label:hover { transform: none !important; box-shadow: none !important; }
+        .heatmap-total-cell { font-size: 0.7rem !important; font-weight: 800 !important; background: #f1f5f9 !important; color: var(--text) !important; cursor: default; }
+        .heatmap-total-cell:hover { transform: none !important; box-shadow: none !important; }
+
+        .loading-overlay { position: fixed; inset: 0; background: rgba(244,246,250,0.85); backdrop-filter: blur(4px); z-index: 998; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity 0.5s; }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .loading-text { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media (max-width: 1200px) { .bottom-grid, .bottom-grid-wide { grid-template-columns: 1fr; } }
+        @media (max-width: 900px) {
+            .sidebar { width: 64px; }
+            .sidebar-header, .nav-item span, .nav-section-label, .sidebar-user-name, .sidebar-user-role, .logout-btn span { display: none; }
+            .sidebar-logo-icon { margin: 0 auto; }
+            .sidebar-user-info { justify-content: center; }
+            .logout-btn { padding: 9px; }
+            .nav-item { justify-content: center; padding: 14px; }
+            .main-content { margin-left: 64px; padding: 20px; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+    <div class="login-bg"><div class="login-grid"></div><div class="login-particles" id="loginParticles"></div></div>
+    <div class="login-card">
+        <div class="login-logo"><div class="login-logo-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div><div><div class="login-logo-text">CHURN CORE</div><div class="login-logo-sub">Executive Analytics</div></div></div>
+        <h2 class="login-heading">Selamat Datang</h2>
+        <p class="login-desc">Masukkan kredensial Anda untuk mengakses dashboard analitik churn.</p>
+        <div class="login-error" id="loginError"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span id="loginErrorText"></span></div>
+        <div class="login-field"><label>Username</label><div class="login-input-wrap"><input type="text" id="loginUser" class="login-input" placeholder="Masukkan username" autocomplete="username"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div></div>
+        <div class="login-field"><label>Password</label><div class="login-input-wrap"><input type="password" id="loginPass" class="login-input" placeholder="Masukkan password" autocomplete="current-password"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><button type="button" class="login-toggle-pw" id="togglePw"><svg id="eyeOff" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg><svg id="eyeOn" viewBox="0 0 24 24" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <button type="button" class="login-btn" id="loginBtn" onclick="handleLogin()"><span class="btn-text">Masuk ke Dashboard</span><div class="btn-spinner"></div></button>
+        <div class="login-footer">Churn Core v2.0 &mdash; Secured Access</div>
+    </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar" style="display:none;">
+    <div class="sidebar-header"><div class="sidebar-logo"><div class="sidebar-logo-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div><div><div class="sidebar-logo-text">CHURN CORE</div><div class="sidebar-logo-sub">Executive Analytics</div></div></div></div>
+    <div class="nav-menu">
+        <div class="nav-section-label">Analisis</div>
+        <div class="nav-item active" onclick="showPage('page1', this)"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Tren Churn & Rate</span></div>
+        <div class="nav-item" onclick="showPage('page2', this)"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>City Detail Analysis</span></div>
+        <div class="nav-item" onclick="showPage('page3', this)"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><span>Product Analysis</span></div>
+        <div class="nav-item" onclick="showPage('page4', this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>Churn Reason</span></div>
+        <div class="nav-section-label">Issue Tracking</div>
+        <div class="nav-item" onclick="showPage('page5', this)"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Mass Problem & Tech Issue</span></div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-info"><div class="sidebar-avatar" id="userAvatar">AF</div><div><div class="sidebar-user-name" id="userName">-</div><div class="sidebar-user-role">Executive Analyst</div></div></div>
+        <button class="logout-btn" onclick="handleLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Keluar</span></button>
+    </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main-content" id="mainContent" style="display:none;">
+    <div class="header-container">
+        <div><h1 class="header-title" id="mainTitle">Overview Tren Churn</h1><div class="header-subtitle" id="headerSub">Analisis performa churn bulanan</div></div>
+        <div id="dataStatus" class="status-indicator"><span class="status-dot"></span><span>Menghubungkan ke GitHub...</span></div>
+    </div>
+
+    <section id="page1" class="page active">
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon blue"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>Churn Growth & Rate Trend</h3></div><div class="chart-container"><canvas id="comboChart"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon amber"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>VC vs IVC Trend</h3></div><div class="chart-container"><canvas id="vcIvcChart"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon indigo"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Vintage Distribution</h3></div><div class="chart-container" style="height:450px;"><canvas id="vintageTrendChart"></canvas></div></div>
+    </section>
+
+    <section id="page2" class="page">
+        <div class="filter-row"><div class="filter-group"><label>Periode</label><select id="fMonth" onchange="updatePage2()"></select></div><div class="filter-group"><label>Regional Group</label><select id="fRegGroup" onchange="onRegGroupChange()"><option value="ALL">Semua</option></select></div><div class="filter-group"><label>Region</label><select id="fRegion" onchange="updatePage2()"><option value="ALL">Semua</option></select></div></div>
+        <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);"><div class="kpi-card kpi-churn"><div class="kpi-top"><span class="kpi-label">Total Churn</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div></div><div id="kpiChurn" class="kpi-value">-</div></div><div class="kpi-card kpi-eop"><div class="kpi-top"><span class="kpi-label">Total EOP</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div></div><div id="kpiEop" class="kpi-value">-</div></div><div class="kpi-card kpi-rate"><div class="kpi-top"><span class="kpi-label">Churn Rate</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div></div><div id="kpiRate" class="kpi-value">-%</div></div></div>
+        <div class="bottom-grid-wide"><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon blue"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>Top 10 City</h3><div class="sort-switch"><button class="sort-btn active" id="vCityCount" onclick="setCityViewMode('count')">COUNT</button><button class="sort-btn" id="vCityPercent" onclick="setCityViewMode('percent')">PERCENT</button></div></div><div class="chart-container"><canvas id="cityChart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon green"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Detail per City</h3><div class="sort-switch"><button class="sort-btn active" id="sortChurn" onclick="setSort('churn')">CHURN</button><button class="sort-btn" id="sortRate" onclick="setSort('rate')">RATE</button></div></div><div class="table-wrapper"><table><thead><tr><th>City</th><th>Churn</th><th>EOP</th><th>Rate</th></tr></thead><tbody id="cityTable"></tbody></table></div></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon red"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>Heatmap: Region vs Vintage</h3><div class="sort-switch"><button class="sort-btn active" id="heatmapCountBtn" onclick="setHeatmapViewMode('count')">COUNT</button><button class="sort-btn" id="heatmapPercentBtn" onclick="setHeatmapViewMode('percent')">ROW %</button></div></div><div class="table-wrapper" style="max-height:600px;"><table class="heatmap-table"><thead id="heatmapHeaderP2"></thead><tbody id="heatmapBodyP2"></tbody></table></div></div>
+    </section>
+
+    <section id="page3" class="page">
+        <div class="filter-row"><div class="filter-group"><label>Periode</label><select id="fMonthProd" onchange="updatePage3()"></select></div></div>
+        <div class="bottom-grid-wide"><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon blue"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>Churn by Product</h3><div class="sort-switch"><button class="sort-btn active" id="viewCount" onclick="setViewMode('count')">COUNT</button><button class="sort-btn" id="viewPercent" onclick="setViewMode('percent')">PERCENT</button></div></div><div class="chart-container"><canvas id="productChart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon green"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Product Detail</h3><div class="sort-switch"><button class="sort-btn active" id="sortProdChurn" onclick="setSortProd('churn')">CHURN</button><button class="sort-btn" id="sortProdRate" onclick="setSortProd('rate')">RATE</button></div></div><div class="table-wrapper"><table><thead><tr><th>Product</th><th>Churn</th><th>EOP</th><th>Rate</th></tr></thead><tbody id="productTable"></tbody></table></div></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon indigo"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Top 5 Product (Vintage)</h3></div><div class="chart-container" style="height:450px;"><canvas id="vintageChart"></canvas></div></div>
+    </section>
+
+    <section id="page4" class="page">
+        <div class="filter-row"><div class="filter-group"><label>Periode</label><select id="fMonthReason" onchange="updatePage4()"></select></div><div class="filter-group"><label>Category</label><select id="fCallCategory" onchange="updatePage4()"><option value="ALL">ALL</option><option value="VC">Voluntary</option><option value="IVC">Involuntary</option></select></div></div>
+        <div class="bottom-grid-wide" style="align-items:flex-start;"><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>Reason Breakdown</h3><div class="sort-switch"><button class="sort-btn active" id="reasonCountBtn" onclick="setReasonViewMode('count')">COUNT</button><button class="sort-btn" id="reasonPercentBtn" onclick="setReasonViewMode('percent')">PERCENT</button></div></div><div class="chart-container" style="height:550px;"><canvas id="reasonChart"></canvas></div></div><div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon green"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Detail</h3></div><div class="table-wrapper" style="max-height:550px;"><table><thead><tr><th>Reason</th><th>Count</th><th>%</th></tr></thead><tbody id="reasonTable"></tbody></table></div></div></div>
+    </section>
+
+    <!-- ===== PAGE 5 ===== -->
+    <section id="page5" class="page">
+        <div class="filter-row">
+            <div class="filter-group"><label>Periode</label><select id="fMonthIssue" onchange="updatePage5()"></select></div>
+            <div class="filter-group">
+                <label>Filter Issue Category</label>
+                <div class="cb-dropdown" id="issueDropdown">
+                    <div class="cb-dropdown-trigger" onclick="toggleCbDropdown('issueDropdown')">
+                        <span class="cb-dropdown-trigger-text" id="issueDropdownText">Semua Issue</span>
+                        <svg class="cb-dropdown-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="cb-dropdown-panel">
+                        <div class="cb-dropdown-search"><input type="text" placeholder="Cari kategori..." oninput="filterCbItems('issueDropdown', this.value)"></div>
+                        <div class="cb-dropdown-list" id="issueDropdownList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-row">
+            <div class="kpi-card kpi-rate">
+                <div class="kpi-top"><span class="kpi-label">Terdampak Issue</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div></div>
+                <div id="kpiImpacted" class="kpi-value">-</div>
+                <div class="kpi-sub">Churn dengan Mass Problem / Tech Issue</div>
+            </div>
+            <div class="kpi-card kpi-churn">
+                <div class="kpi-top"><span class="kpi-label">% dari Total Churn</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div></div>
+                <div id="kpiImpactRate" class="kpi-value">-%</div>
+                <div class="kpi-sub">Proporsi terdampak dari seluruh churn</div>
+            </div>
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-top"><span class="kpi-label">Dominan Issue</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div></div>
+                <div id="kpiDominant" class="kpi-value" style="font-size:1rem;">-</div>
+                <div class="kpi-sub">Kategori issue paling banyak</div>
+            </div>
+            <div class="kpi-card kpi-eop">
+                <div class="kpi-top"><span class="kpi-label">Normal (No Issue)</span><div class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div></div>
+                <div id="kpiNormal" class="kpi-value">-</div>
+                <div class="kpi-sub">Churn tanpa Mass Problem maupun Tech Issue</div>
+            </div>
+        </div>
+        <div class="bottom-grid">
+            <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/></svg></span>Distribusi Issue Category</h3></div><div class="chart-container"><canvas id="issueDonutChart"></canvas></div></div>
+            <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon blue"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>Top 10 City Terdampak</h3></div><div class="chart-container"><canvas id="issueCityChart"></canvas></div></div>
+        </div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon red"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>Heatmap: Region vs Vintage (Terdampak Issue)</h3><div class="sort-switch"><button class="sort-btn active" id="issueHmCount" onclick="setIssueHmMode('count')">COUNT</button><button class="sort-btn" id="issueHmPct" onclick="setIssueHmMode('percent')">ROW %</button></div></div><div class="table-wrapper" style="max-height:550px;"><table class="heatmap-table"><thead id="issueHmHeader"></thead><tbody id="issueHmBody"></tbody></table></div></div>
+        <div class="card"><div class="card-header"><h3 class="card-title"><span class="card-title-icon green"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Detail per City (Issue Breakdown)</h3></div><div class="table-wrapper" style="max-height:520px;"><table><thead><tr><th>City</th><th>Total Churn</th><th>Terdampak</th><th>Impact %</th><th>Issue Breakdown</th></tr></thead><tbody id="issueDetailTable"></tbody></table></div></div>
+    </section>
+</main>
+
+<div class="loading-overlay hidden" id="loadingOverlay"><div class="loading-spinner"></div><div class="loading-text">Memuat data dari GitHub...</div></div>
+
+<script>
+const URL_CHURN='https://raw.githubusercontent.com/AlvyFahmy/churn/main/churn-detail.xlsx';
+const URL_EOP='https://raw.githubusercontent.com/AlvyFahmy/churn/main/eop-summary.xlsx';
+const URL_USERS='https://raw.githubusercontent.com/AlvyFahmy/churn/main/userlogin.xlsx';
+const ISSUE_COL='FINAL RESULT TECH PROBLEM & MASS PROBLEM';
+const NORMAL_VAL='Normal';
+
+let rawChurn=[],rawEop=[],rawEopProduct=[],userCredentials=[];
+let chart1=null,chartVcIvc=null,chartVintageTrend=null,chartCity=null,chartProd=null,chartVintage=null,chartReason=null;
+let chartIssueDonut=null,chartIssueCity=null;
+let currentSort='churn',currentSortProd='churn',currentViewMode='count',currentCityViewMode='count',currentReasonViewMode='count',currentHeatmapViewMode='count',issueHmMode='count';
+let issueDropdownState={options:[],selected:new Set()};
+const monthsOrder=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const vintageOrder=["1-3 Month","4-6 Month","7-9 Month","10-12 Month","1-2 Year","2-3 Year","> 3 Year"];
+const vintageColors=['#172554','#1e3a8a','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd'];
+const pageSubtitles={page1:'Analisis performa churn bulanan',page2:'Drilldown churn berdasarkan kota dan wilayah',page3:'Distribusi churn berdasarkan produk dan layanan',page4:'Identifikasi penyebab utama churn pelanggan',page5:'Identifikasi populasi churn yang terdampak Mass Problem & Technical Issue'};
+
+/* Partikel */
+(function(){const c=document.getElementById('loginParticles');for(let i=0;i<30;i++){const s=document.createElement('span');s.style.left=Math.random()*100+'%';s.style.animationDuration=(8+Math.random()*14)+'s';s.style.animationDelay=Math.random()*10+'s';s.style.width=s.style.height=(1.5+Math.random()*2.5)+'px';s.style.opacity=0.2+Math.random()*0.5;c.appendChild(s);}})();
+document.getElementById('togglePw').addEventListener('click',function(){const i=document.getElementById('loginPass'),h=i.type==='password';i.type=h?'text':'password';document.getElementById('eyeOff').style.display=h?'none':'block';document.getElementById('eyeOn').style.display=h?'block':'none';});
+document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')handleLogin();});
+
+/* Login */
+async function handleLogin(){
+    const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value,er=document.getElementById('loginError'),et=document.getElementById('loginErrorText'),btn=document.getElementById('loginBtn');
+    if(!u||!p){et.textContent='Username dan password wajib diisi.';er.classList.add('show');if(!u)document.getElementById('loginUser').classList.add('error');if(!p)document.getElementById('loginPass').classList.add('error');return;}
+    er.classList.remove('show');document.getElementById('loginUser').classList.remove('error');document.getElementById('loginPass').classList.remove('error');
+    btn.classList.add('loading');btn.disabled=true;
+    try{
+        if(!userCredentials.length){const r=await fetch(`${URL_USERS}?t=${Date.now()}`);if(!r.ok)throw new Error();const b=await r.arrayBuffer(),w=XLSX.read(b,{type:'array'});userCredentials=XLSX.utils.sheet_to_json(w.Sheets[w.SheetNames[0]]).map(r=>({username:String(r['username']||'').trim().toLowerCase(),password:String(r['password']||'').trim(),fullname:String(r['full name']||r['fullname']||'').trim()}));}
+        const user=userCredentials.find(x=>x.username===u.toLowerCase()&&x.password===p);
+        if(!user){et.textContent='Username atau password salah.';er.classList.add('show');document.getElementById('loginUser').classList.add('error');document.getElementById('loginPass').classList.add('error');btn.classList.remove('loading');btn.disabled=false;return;}
+        sessionStorage.setItem('churnUser',JSON.stringify({username:user.username,fullname:user.fullname}));
+        document.getElementById('loginOverlay').classList.add('hidden');setTimeout(()=>{document.getElementById('loginOverlay').style.display='none';showDashboard(user);},500);
+    }catch(e){et.textContent='Koneksi gagal. Coba lagi.';er.classList.add('show');}finally{btn.classList.remove('loading');btn.disabled=false;}
+}
+function handleLogout(){sessionStorage.removeItem('churnUser');userCredentials=[];document.getElementById('loginUser').value='';document.getElementById('loginPass').value='';document.getElementById('loginError').classList.remove('show');document.getElementById('loginUser').classList.remove('error');document.getElementById('loginPass').classList.remove('error');document.getElementById('sidebar').style.display='none';document.getElementById('mainContent').style.display='none';const o=document.getElementById('loginOverlay');o.style.display='';o.classList.remove('hidden');setTimeout(()=>document.getElementById('loginUser').focus(),300);}
+function showDashboard(user){const i=user.fullname.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);document.getElementById('userAvatar').textContent=i;document.getElementById('userName').textContent=user.fullname;document.getElementById('sidebar').style.display='flex';document.getElementById('mainContent').style.display='block';initDashboard();}
+(function(){const s=sessionStorage.getItem('churnUser');if(s){try{showDashboard(JSON.parse(s));document.getElementById('loginOverlay').style.display='none';}catch(e){sessionStorage.removeItem('churnUser');}}else{document.getElementById('sidebar').style.display='none';document.getElementById('mainContent').style.display='none';setTimeout(()=>document.getElementById('loginUser').focus(),400);}})();
+
+async function initDashboard(){
+    const o=document.getElementById('loadingOverlay');o.classList.remove('hidden');
+    try{
+        const[rC,rE]=await Promise.all([fetch(`${URL_CHURN}?t=${Date.now()}`).then(r=>{if(!r.ok)throw new Error();return r.arrayBuffer();}),fetch(`${URL_EOP}?t=${Date.now()}`).then(r=>{if(!r.ok)throw new Error();return r.arrayBuffer();})]);
+        rawChurn=XLSX.utils.sheet_to_json(XLSX.read(rC,{type:'array'}).Sheets[XLSX.read(rC,{type:'array'}).SheetNames[0]]);
+        const wE=XLSX.read(rE,{type:'array'});rawEop=XLSX.utils.sheet_to_json(wE.Sheets[wE.SheetNames[0]]);rawEopProduct=XLSX.utils.sheet_to_json(wE.Sheets['eop_product']||wE.Sheets[0]);
+        setStatus('connected',`${rawChurn.length.toLocaleString('id-ID')} baris dimuat`);populateFilters();buildIssueDropdownOptions();renderPage1Charts();
+    }catch(e){setStatus('error','Gagal memuat data');}finally{o.classList.add('hidden');}
+}
+
+function showPage(id,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById(id).classList.add('active');el.classList.add('active');const t={page1:'Overview Tren Churn',page2:'City Detail Analysis',page3:'Product Breakdown',page4:'Churn Reason Analysis',page5:'Mass Problem & Tech Issue'};document.getElementById('mainTitle').innerText=t[id];document.getElementById('headerSub').innerText=pageSubtitles[id];if(id==='page1')renderPage1Charts();else if(id==='page2')updatePage2();else if(id==='page3')updatePage3();else if(id==='page4')updatePage4();else if(id==='page5')updatePage5();}
+function setCityViewMode(m){currentCityViewMode=m;document.getElementById('vCityCount').classList.toggle('active',m==='count');document.getElementById('vCityPercent').classList.toggle('active',m==='percent');updatePage2();}
+function setReasonViewMode(m){currentReasonViewMode=m;document.getElementById('reasonCountBtn').classList.toggle('active',m==='count');document.getElementById('reasonPercentBtn').classList.toggle('active',m==='percent');updatePage4();}
+function setSort(t){currentSort=t;document.getElementById('sortChurn').classList.toggle('active',t==='churn');document.getElementById('sortRate').classList.toggle('active',t==='rate');updatePage2();}
+function setSortProd(t){currentSortProd=t;document.getElementById('sortProdChurn').classList.toggle('active',t==='churn');document.getElementById('sortProdRate').classList.toggle('active',t==='rate');updatePage3();}
+function setViewMode(m){currentViewMode=m;document.getElementById('viewCount').classList.toggle('active',m==='count');document.getElementById('viewPercent').classList.toggle('active',m==='percent');updatePage3();}
+function setHeatmapViewMode(m){currentHeatmapViewMode=m;document.getElementById('heatmapCountBtn').classList.toggle('active',m==='count');document.getElementById('heatmapPercentBtn').classList.toggle('active',m==='percent');updatePage2();}
+function setIssueHmMode(m){issueHmMode=m;document.getElementById('issueHmCount').classList.toggle('active',m==='count');document.getElementById('issueHmPct').classList.toggle('active',m==='percent');updatePage5();}
+
+function animateValue(el,end,suffix='',isFloat=false){const d=600,st=performance.now(),en=parseFloat(end)||0;function step(now){const p=Math.min((now-st)/d,1),c=en*(1-Math.pow(1-p,3));el.innerText=(isFloat?c.toFixed(2):Math.round(c).toLocaleString('id-ID'))+suffix;if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);}
+function setStatus(t,txt){const el=document.getElementById('dataStatus');el.className='status-indicator '+t;el.innerHTML=`<span class="status-dot"></span><span>${txt}</span>`;}
+function populateFilters(){const m=[...new Set(rawChurn.map(d=>d['PERIODE CHURN']))].filter(Boolean).sort((a,b)=>monthsOrder.indexOf(a)-monthsOrder.indexOf(b));['fMonth','fMonthProd','fMonthReason','fMonthIssue'].forEach(id=>{const el=document.getElementById(id);el.innerHTML="";m.forEach(x=>el.add(new Option(x,x)));if(m.length)el.value=m[m.length-1];});const rg=[...new Set(rawChurn.map(d=>d['REGIONAL GROUP']))].filter(Boolean).sort();const f=document.getElementById('fRegGroup');f.innerHTML='<option value="ALL">Semua</option>';rg.forEach(x=>f.add(new Option(x,x)));onRegGroupChange();}
+function onRegGroupChange(){const g=document.getElementById('fRegGroup').value,f=document.getElementById('fRegion');f.innerHTML='<option value="ALL">Semua</option>';let r=g==="ALL"?[...new Set(rawChurn.map(d=>d['REGION_CITY']))]:[...new Set(rawChurn.filter(d=>d['REGIONAL GROUP']===g).map(d=>d['REGION_CITY']))];r.filter(Boolean).sort().forEach(x=>f.add(new Option(x,x)));updatePage2();}
+
+/* Checkbox Dropdown — HANYA kategori issue (bukan Normal) */
+function buildIssueDropdownOptions(){
+    const vals=[...new Set(rawChurn.map(d=>(d[ISSUE_COL]||'').toString().trim()))].filter(Boolean).filter(v=>v!==NORMAL_VAL).sort();
+    issueDropdownState.options=vals;
+    issueDropdownState.selected=new Set(vals);
+    renderCbDropdownList('issueDropdown');updateCbTriggerText('issueDropdown','issueDropdownText');
+}
+function renderCbDropdownList(dId){
+    const list=document.getElementById(dId+'List'),st=issueDropdownState,allSel=st.selected.size===st.options.length;
+    let html=`<div class="cb-dropdown-item select-all ${allSel?'selected':''}" onclick="toggleCbSelectAll('${dId}')"><div class="cb-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><span>Select All (${st.options.length})</span></div>`;
+    st.options.forEach(opt=>{
+        const sel=st.selected.has(opt);
+        html+=`<div class="cb-dropdown-item ${sel?'selected':''}" data-value="${opt}" onclick="toggleCbItem('${dId}','${opt.replace(/'/g,"\\'")}')"><div class="cb-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><span>${opt}</span></div>`;
+    });
+    list.innerHTML=html;
+}
+function toggleCbSelectAll(dId){const st=issueDropdownState;if(st.selected.size===st.options.length)st.selected.clear();else st.selected=new Set(st.options);renderCbDropdownList(dId);updateCbTriggerText(dId,dId+'Text');updatePage5();}
+function toggleCbItem(dId,value){const st=issueDropdownState;if(st.selected.has(value))st.selected.delete(value);else st.selected.add(value);renderCbDropdownList(dId);updateCbTriggerText(dId,dId+'Text');updatePage5();}
+function updateCbTriggerText(dId,tId){const st=issueDropdownState,el=document.getElementById(tId);if(st.selected.size===0)el.innerHTML='<span style="color:var(--text-muted)">Tidak ada dipilih</span>';else if(st.selected.size===st.options.length)el.innerHTML='Semua Issue';else{const items=[...st.selected].slice(0,2).map(s=>`<span style="color:var(--accent);font-weight:600">${s}</span>`).join(', ');el.innerHTML=items+` <span class="cb-count">+${st.selected.size-2}</span>`;}}
+function filterCbItems(dId,q){q=q.toLowerCase();document.querySelectorAll(`#${dId}List .cb-dropdown-item:not(.select-all)`).forEach(el=>{el.classList.toggle('hidden',(el.getAttribute('data-value')||'').toLowerCase().indexOf(q)===-1);});}
+function toggleCbDropdown(dId){document.getElementById(dId).classList.toggle('open');}
+document.addEventListener('click',e=>{document.querySelectorAll('.cb-dropdown.open').forEach(dd=>{if(!dd.contains(e.target))dd.classList.remove('open');});});
+
+Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=12;Chart.defaults.color='#64748b';Chart.defaults.plugins.legend.labels.usePointStyle=true;Chart.defaults.plugins.legend.labels.pointStyleWidth=10;Chart.defaults.plugins.legend.labels.padding=18;
+
+/* PAGE 1 */
+function renderPage1Charts(){
+    const labels=[...new Set(rawChurn.map(d=>d['PERIODE CHURN']))].filter(Boolean).sort((a,b)=>monthsOrder.indexOf(a)-monthsOrder.indexOf(b));
+    const counts=labels.map(m=>rawChurn.filter(d=>d['PERIODE CHURN']===m).length);
+    const rates=labels.map(m=>{const s=rawEop.filter(d=>(d['PERIODE']||d['PERIOD']||d['Periode'])===m).reduce((a,c)=>a+(parseFloat(c['TOTAL EOP']||c['Total EOP'])||0),0);return s>0?(rawChurn.filter(d=>d['PERIODE CHURN']===m).length/s*100).toFixed(2):0;});
+    if(chart1)chart1.destroy();chart1=new Chart(document.getElementById('comboChart').getContext('2d'),{data:{labels,datasets:[{type:'line',label:'Churn Rate (%)',data:rates,borderColor:'#ef4444',borderWidth:3,yAxisID:'y1',tension:0.4,pointRadius:5,pointBackgroundColor:'#ef4444',pointBorderColor:'#fff',pointBorderWidth:2},{type:'bar',label:'Total Churn',data:counts,backgroundColor:'rgba(29,78,216,0.55)',borderRadius:6,yAxisID:'y',borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},y1:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}},plugins:{legend:{position:'top',align:'end'}}}});
+    const vc=labels.map(m=>rawChurn.filter(d=>d['PERIODE CHURN']===m&&d['CATEGORY CALL']==='VC').length),ivc=labels.map(m=>rawChurn.filter(d=>d['PERIODE CHURN']===m&&d['CATEGORY CALL']==='IVC').length);
+    if(chartVcIvc)chartVcIvc.destroy();chartVcIvc=new Chart(document.getElementById('vcIvcChart').getContext('2d'),{type:'line',data:{labels,datasets:[{label:'Voluntary (VC)',data:vc,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)',tension:0.4,fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#10b981',pointBorderColor:'#fff',pointBorderWidth:2},{label:'Involuntary (IVC)',data:ivc,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)',tension:0.4,fill:true,borderWidth:3,pointRadius:4,pointBackgroundColor:'#f59e0b',pointBorderColor:'#fff',pointBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},x:{grid:{display:false}}},plugins:{legend:{position:'top',align:'end'}}}});
+    const vDS=vintageOrder.map((vL,i)=>({type:'bar',label:vL,backgroundColor:vintageColors[i],borderRadius:2,borderSkipped:false,data:labels.map(m=>rawChurn.filter(d=>d['PERIODE CHURN']===m&&d['VINTAGE GROUP']===vL).length),datalabels:{display:true,color:'white',font:{weight:'bold',size:9},formatter:(v,c)=>{const t=counts[c.dataIndex];return(v===0||t===0)?null:Math.round((v/t)*100)+'%';}}}));
+    vDS.push({type:'line',label:'Total',data:counts,showLine:false,pointRadius:0,datalabels:{display:true,align:'top',anchor:'end',offset:2,color:'#0f172a',font:{weight:'700',size:12},formatter:v=>v.toLocaleString('id-ID')}});
+    if(chartVintageTrend)chartVintageTrend.destroy();chartVintageTrend=new Chart(document.getElementById('vintageTrendChart').getContext('2d'),{plugins:[ChartDataLabels],data:{labels,datasets:vDS},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:30}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}}},plugins:{legend:{position:'bottom',labels:{filter:i=>i.text!=='Total'}}}}});
+}
+
+/* PAGE 2 */
+function updatePage2(){
+    const month=document.getElementById('fMonth').value,rg=document.getElementById('fRegGroup').value,reg=document.getElementById('fRegion').value;
+    let fC=rawChurn.filter(d=>d['PERIODE CHURN']===month);if(rg!=="ALL")fC=fC.filter(d=>d['REGIONAL GROUP']===rg);if(reg!=="ALL")fC=fC.filter(d=>d['REGION_CITY']===reg);
+    let fE=rawEop.filter(d=>(d['PERIODE']||d['PERIOD']||d['Periode'])===month);if(rg!=="ALL")fE=fE.filter(d=>d['REGIONAL GROUP']===rg);if(reg!=="ALL")fE=fE.filter(d=>d['REGION_CITY']===reg);
+    const tC=fC.length,tE=fE.reduce((a,b)=>a+(parseFloat(b['TOTAL EOP']||b['Total EOP'])||0),0),tR=tE>0?((tC/tE)*100).toFixed(2):0;
+    animateValue(document.getElementById('kpiChurn'),tC);animateValue(document.getElementById('kpiEop'),tE);animateValue(document.getElementById('kpiRate'),tR,'%',true);
+    const cm={};fC.forEach(d=>{const c=d['CITY']||'Unknown';if(!cm[c])cm[c]={churn:0,eop:0};cm[c].churn++;});fE.forEach(d=>{const c=d['CITY']||'Unknown';if(!cm[c])cm[c]={churn:0,eop:0};cm[c].eop+=(parseFloat(d['TOTAL EOP']||d['Total EOP'])||0);});
+    const sorted=Object.entries(cm).map(([c,v])=>({city:c,churn:v.churn,eop:v.eop,rate:v.eop>0?((v.churn/v.eop)*100).toFixed(2):0})).sort((a,b)=>currentSort==='churn'?b.churn-a.churn:b.rate-a.rate);
+    const t10=sorted.slice(0,10);if(chartCity)chartCity.destroy();chartCity=new Chart(document.getElementById('cityChart').getContext('2d'),{type:'bar',data:{labels:t10.map(d=>d.city),datasets:[{label:currentCityViewMode==='count'?'Count':'%',data:t10.map(d=>currentCityViewMode==='count'?d.churn:(tC>0?((d.churn/tC)*100).toFixed(2):0)),backgroundColor:t10.map((_,i)=>`rgba(29,78,216,${Math.max(0.85-i*0.05,0.3)})`),borderRadius:6,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+    document.getElementById('cityTable').innerHTML=sorted.map(d=>`<tr><td>${d.city}</td><td>${d.churn.toLocaleString('id-ID')}</td><td>${d.eop.toLocaleString('id-ID')}</td><td><span class="badge-rate ${d.rate>5?'badge-danger':'badge-safe'}">${d.rate}%</span></td></tr>`).join('');
+    renderHeatmap(fC,'heatmapHeaderP2','heatmapBodyP2',currentHeatmapViewMode==='percent');
+}
+
+/* Heatmap shared */
+function renderHeatmap(data,hId,bId,isPct){
+    const regs=[...new Set(data.map(d=>d['REGION_CITY']))].filter(Boolean).sort(),h=document.getElementById(hId),b=document.getElementById(bId);
+    if(!regs.length){h.innerHTML='';b.innerHTML='<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--text-muted);">Tidak ada data</td></tr>';return;}
+    h.innerHTML=`<tr><th class="heatmap-label" style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;">Region City</th>${vintageOrder.map(v=>`<th>${v}</th>`).join('')}<th style="font-weight:800;color:var(--text);">TOTAL</th></tr>`;
+    const mx={},rT={},cT={};let gT=0;regs.forEach(r=>{mx[r]={};let s=0;vintageOrder.forEach(v=>{const val=data.filter(d=>d['REGION_CITY']===r&&d['VINTAGE GROUP']===v).length;mx[r][v]=val;s+=val;cT[v]=(cT[v]||0)+val;gT+=val;});rT[r]=s;});
+    let maxV=0;regs.forEach(r=>vintageOrder.forEach(v=>{if(mx[r][v]>maxV)maxV=mx[r][v];}));if(!maxV)maxV=1;
+    function tc(a){const R=Math.round(248*(1-a)+29*a),G=Math.round(250*(1-a)+78*a),B=Math.round(252*(1-a)+216*a);return(0.299*R+0.587*G+0.114*B)<155?'#ffffff':'#0f172a';}
+    b.innerHTML=regs.map(r=>{const rs=rT[r];let row=`<tr><td class="heatmap-label">${r}</td>`;vintageOrder.forEach(v=>{const val=mx[r][v],ratio=val/maxV,alpha=val>0?0.12+ratio*0.83:0,bg=val>0?`rgba(29,78,216,${alpha.toFixed(3)})`:'#f8fafc',clr=val>0?tc(alpha):'#cbd5e1';row+=`<td style="background:${bg};color:${clr}">${val===0?'-':isPct?((val/rs)*100).toFixed(1)+'%':val.toLocaleString('id-ID')}</td>`;});return row+`<td class="heatmap-total-cell">${rs.toLocaleString('id-ID')}</td></tr>`;}).join('')+`<tr><td class="heatmap-total-label">TOTAL</td>${vintageOrder.map(v=>`<td class="heatmap-total-cell">${(cT[v]||0).toLocaleString('id-ID')}</td>`).join('')}<td class="heatmap-total-cell" style="font-weight:900;">${gT.toLocaleString('id-ID')}</td></tr>`;
+}
+
+/* PAGE 3 */
+function updatePage3(){
+    const month=document.getElementById('fMonthProd').value;let fC=rawChurn.filter(d=>d['PERIODE CHURN']===month),fEP=rawEopProduct.filter(d=>(d['PERIODE']||d['PERIOD']||d['Periode'])===month),tC=fC.length;
+    const pm={},vm={};fC.forEach(d=>{const p=d['SERVICE TYPE']||'Others';if(!pm[p])pm[p]={churn:0,eop:0};pm[p].churn++;const v=d['VINTAGE GROUP']||'Others';if(!vm[p])vm[p]={};vm[p][v]=(vm[p][v]||0)+1;});fEP.forEach(d=>{const p=d['Speed']||'Others';if(!pm[p])pm[p]={churn:0,eop:0};pm[p].eop+=(parseFloat(d['TOTAL EOP']||d['Total EOP'])||0);});
+    const sorted=Object.entries(pm).map(([p,v])=>({prod:p,churn:v.churn,eop:v.eop,rate:v.eop>0?((v.churn/v.eop)*100).toFixed(2):0})).sort((a,b)=>currentSortProd==='churn'?b.churn-a.churn:b.rate-a.rate);
+    if(chartProd)chartProd.destroy();chartProd=new Chart(document.getElementById('productChart').getContext('2d'),{type:'bar',data:{labels:sorted.map(d=>d.prod),datasets:[{label:currentViewMode==='count'?'Count':'%',data:sorted.map(d=>currentViewMode==='count'?d.churn:(tC>0?((d.churn/tC)*100).toFixed(2):0)),backgroundColor:sorted.map((_,i)=>`hsla(${220+i*8},70%,50%,0.65)`),borderRadius:6,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+    const top5=sorted.slice(0,5).map(d=>d.prod);const vDS=vintageOrder.map((vL,i)=>({label:vL,backgroundColor:vintageColors[i],data:top5.map(p=>{const t=vm[p]?Object.values(vm[p]).reduce((a,b)=>a+b,0):0;return t>0?(((vm[p][vL]||0)/t)*100).toFixed(1):0;}),datalabels:{display:true,color:'white',font:{weight:'bold',size:9},formatter:v=>v>0?v+'%':null}}));
+    if(chartVintage)chartVintage.destroy();chartVintage=new Chart(document.getElementById('vintageChart').getContext('2d'),{plugins:[ChartDataLabels],type:'bar',data:{labels:top5,datasets:vDS},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,max:100,ticks:{callback:v=>v+'%',stepSize:25},grid:{color:'rgba(0,0,0,0.04)'}}},plugins:{legend:{position:'bottom'}}}});
+    document.getElementById('productTable').innerHTML=sorted.map(d=>`<tr><td>${d.prod}</td><td>${d.churn.toLocaleString('id-ID')}</td><td>${d.eop.toLocaleString('id-ID')}</td><td><span class="badge-rate ${d.rate>5?'badge-danger':'badge-safe'}">${d.rate}%</span></td></tr>`).join('');
+}
+
+/* PAGE 4 */
+function updatePage4(){
+    const month=document.getElementById('fMonthReason').value,cat=document.getElementById('fCallCategory').value;let fC=rawChurn.filter(d=>d['PERIODE CHURN']===month);if(cat!=="ALL")fC=fC.filter(d=>d['CATEGORY CALL']===cat);
+    const tC=fC.length,rm={};fC.forEach(d=>{const r=d['REASON FINAL']?d['REASON FINAL'].toString().trim():'Uncategorized';rm[r]=(rm[r]||0)+1;});
+    const sorted=Object.entries(rm).map(([r,c])=>({reason:r,count:c,percent:tC>0?((c/tC)*100).toFixed(2):0})).sort((a,b)=>b.count-a.count);
+    if(chartReason)chartReason.destroy();chartReason=new Chart(document.getElementById('reasonChart').getContext('2d'),{type:'bar',data:{labels:sorted.map(d=>d.reason),datasets:[{label:currentReasonViewMode==='count'?'Count':'%',data:sorted.map(d=>currentReasonViewMode==='count'?d.count:d.percent),backgroundColor:sorted.map((_,i)=>`hsla(${35+i*8},85%,55%,${0.85-i*0.03})`),borderRadius:6,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},y:{grid:{display:false},ticks:{font:{size:11}}}},plugins:{legend:{display:false}}}});
+    document.getElementById('reasonTable').innerHTML=sorted.map(d=>`<tr><td>${d.reason}</td><td>${d.count.toLocaleString('id-ID')}</td><td><span class="badge-rate badge-safe">${d.percent}%</span></td></tr>`).join('');
+}
+
+/* ===== PAGE 5: MASS PROBLEM & TECH ISSUE ===== */
+/* LOGIKA:
+   - "Normal" = churn TANPA mass problem maupun tech issue (tidak terdampak)
+   - Checkbox hanya berisi kategori issue (non-Normal)
+   - "Terdampak" = churn yang valuenya ADA di checkbox terpilih
+   - Jika semua checkbox kosong → terdampak = 0
+*/
+function updatePage5(){
+    const month=document.getElementById('fMonthIssue').value;
+    const selected=issueDropdownState.selected;
+
+    /* Semua churn periode ini */
+    const fAll=rawChurn.filter(d=>d['PERIODE CHURN']===month);
+    const totalChurn=fAll.length;
+
+    /* Normal = value === "Normal" → TIDAK terdampak issue apapun */
+    const normalCount=fAll.filter(d=>(d[ISSUE_COL]||'').toString().trim()===NORMAL_VAL).length;
+
+    /* Terdampak = value BUKAN "Normal" DAN ada di checkbox yang dipilih */
+    const fImpacted=fAll.filter(d=>{
+        const val=(d[ISSUE_COL]||'').toString().trim();
+        return val!==NORMAL_VAL && selected.has(val);
+    });
+    const impactedCount=fImpacted.length;
+    const impactRate=totalChurn>0?((impactedCount/totalChurn)*100).toFixed(2):0;
+
+    /* KPI */
+    animateValue(document.getElementById('kpiImpacted'),impactedCount);
+    animateValue(document.getElementById('kpiImpactRate'),impactRate,'%',true);
+    animateValue(document.getElementById('kpiNormal'),normalCount);
+
+    /* Dominan issue dari data terdampak */
+    const issueBreakdown={};
+    fImpacted.forEach(d=>{const v=(d[ISSUE_COL]||'').toString().trim();issueBreakdown[v]=(issueBreakdown[v]||0)+1;});
+    const dominant=Object.entries(issueBreakdown).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('kpiDominant').innerText=dominant?`${dominant[0]} (${dominant[1].toLocaleString('id-ID')})`:'-';
+
+    /* Donut */
+    const dLabels=Object.keys(issueBreakdown),dData=Object.values(issueBreakdown);
+    const dColors=['#ef4444','#f59e0b','#6366f1','#1d4ed8','#ec4899','#8b5cf6','#06b6d4','#10b981'];
+    if(chartIssueDonut)chartIssueDonut.destroy();
+    chartIssueDonut=new Chart(document.getElementById('issueDonutChart').getContext('2d'),{
+        type:'doughnut',data:{labels:dLabels,datasets:[{data:dData,backgroundColor:dColors.slice(0,dLabels.length),borderWidth:3,borderColor:'#fff',hoverOffset:8}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:11,weight:500}}},datalabels:{display:true,color:'#fff',font:{weight:700,size:11},formatter:(v,c)=>{const t=c.dataset.data.reduce((a,b)=>a+b,0);return t>0?((v/t)*100).toFixed(1)+'%':'';}}}}
+    });
+
+    /* Top 10 city terdampak */
+    const cityMap={};fImpacted.forEach(d=>{const c=d['CITY']||'Unknown';cityMap[c]=(cityMap[c]||0)+1;});
+    const topCities=Object.entries(cityMap).map(([c,v])=>({city:c,count:v})).sort((a,b)=>b.count-a.count).slice(0,10);
+    if(chartIssueCity)chartIssueCity.destroy();
+    chartIssueCity=new Chart(document.getElementById('issueCityChart').getContext('2d'),{
+        type:'bar',data:{labels:topCities.map(d=>d.city),datasets:[{label:'Terdampak',data:topCities.map(d=>d.count),backgroundColor:topCities.map((_,i)=>`rgba(239,68,68,${Math.max(0.85-i*0.05,0.35)})`),borderRadius:6,borderSkipped:false}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'}},y:{grid:{display:false}}},plugins:{legend:{display:false}}}
+    });
+
+    /* Heatmap */
+    renderHeatmap(fImpacted,'issueHmHeader','issueHmBody',issueHmMode==='percent');
+
+    /* Detail table */
+    const detailMap={};
+    fAll.forEach(d=>{
+        const c=d['CITY']||'Unknown';
+        if(!detailMap[c])detailMap[c]={total:0,issues:{}};
+        detailMap[c].total++;
+        const val=(d[ISSUE_COL]||'').toString().trim();
+        if(val!==NORMAL_VAL && selected.has(val)){
+            detailMap[c].issues[val]=(detailMap[c].issues[val]||0)+1;
+        }
+    });
+    const detailSorted=Object.entries(detailMap)
+        .map(([city,v])=>({city,total:v.total,impacted:Object.values(v.issues).reduce((a,b)=>a+b,0),issues:v.issues,rate:v.total>0?((Object.values(v.issues).reduce((a,b)=>a+b,0)/v.total)*100).toFixed(2):0}))
+        .filter(d=>d.impacted>0)
+        .sort((a,b)=>b.impacted-a.impacted);
+
+    document.getElementById('issueDetailTable').innerHTML=detailSorted.map(d=>{
+        const bd=Object.entries(d.issues).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="badge-rate badge-warn">${k}: ${v.toLocaleString('id-ID')}</span>`).join('');
+        return `<tr><td>${d.city}</td><td>${d.total.toLocaleString('id-ID')}</td><td style="font-weight:700;color:var(--danger);">${d.impacted.toLocaleString('id-ID')}</td><td><span class="badge-rate ${d.rate>30?'badge-danger':d.rate>15?'badge-warn':'badge-safe'}">${d.rate}%</span></td><td style="max-width:320px;">${bd}</td></tr>`;
+    }).join('');
+}
+</script>
+</body>
+</html>
